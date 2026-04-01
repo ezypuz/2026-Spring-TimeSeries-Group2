@@ -1,0 +1,82 @@
+\documentclass[11pt, a4paper]{article}
+
+% 한글 폰트 및 필수 패키지 로드
+\usepackage{kotex}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+% 용지 여백 설정
+\geometry{top=2.5cm, bottom=2.5cm, left=2cm, right=2cm}
+
+\title{\textbf{시계열 분석 프로젝트 기획안} \\ \Large BTC-ETH 공적분 관계를 활용한 통계적 차익거래 전략 연구}
+\author{시계열 분석 및 실습 00분반 \\ [1ex] 제 4조: 팀원명A, 팀원명B, 팀원명C, 팀원명D}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section{프로젝트 개요}
+	본 프로젝트는 암호화폐 시장에서 시가총액과 유동성이 가장 높은 비트코인(BTC)과 이더리움(ETH) 간의 \textbf{장기적 균형 관계(Cointegration)}를 통계적으로 검증하고, 이를 바탕으로 한 \textbf{통계적 차익거래(Pairs Trading)} 알고리즘을 구축하는 것을 목적으로 한다. 단순히 가격을 예측하는 것을 넘어, 데이터의 통계적 특성에 기반한 모델링 과정을 통해 퀀트 전략의 정당성을 확보하고자 한다.
+	
+	\section{데이터 수집 및 전처리 계획}
+	\begin{itemize}
+		\item \textbf{데이터 소스:} Binance 거래소 (Python \texttt{ccxt} 라이브러리 활용)
+		\item \textbf{분석 대상:} BTC/USDT, ETH/USDT 종가(Close) 데이터
+		\item \textbf{데이터 주기:} 1시간봉(1h) 혹은 1일봉(1d) (최근 2-3년치 데이터)
+		\item \textbf{전처리 과정:} 가격 데이터에 로그($\ln$) 변환을 수행한다. 이는 가격의 절대 수치 차이에 따른 왜곡을 방지하고, 시계열의 선형성 확보 및 수익률 관점의 분석을 가능하게 하기 위함이다.
+	\end{itemize}
+	
+	\section{연구 방법론 및 모델 선정 근거}
+	교수님이 강조하신 모델 선정의 논리적 근거는 다음과 같은 단계적 검정을 통해 제시한다.
+	
+	\subsection{정상성 검정 (ADF Test)}
+	금융 자산의 가격 시계열은 일반적으로 평균과 분산이 시간에 따라 변하는 \textbf{비정상 시계열(Non-stationary)}이다. 각 자산의 로그 가격에 대해 \textit{Augmented Dickey-Fuller Test}를 수행하여 단위근(Unit Root) 존재 여부를 확인하고, 일반 회귀분석 시 발생할 수 있는 가짜 회귀(Spurious Regression)의 위험성을 지적한다.
+	
+	\subsection{공적분 검정 (Johansen Test)}
+	개별적으로는 비정상인 두 시계열이 선형 결합을 통해 정상 시계열을 형성하는지 확인하기 위해 \textit{Johansen Cointegration Test}를 수행한다. 이는 두 자산이 장기적으로 같은 방향성을 공유하며, 일시적인 괴리는 다시 균형으로 회귀한다는 통계적 증거가 된다.
+	
+	\subsection{벡터 오차 수정 모델 (VECM)}
+	공적분 관계가 입증된 데이터의 동학적 분석을 위해 \textbf{VECM(Vector Error Correction Model)}을 구축한다. 모델의 수식은 다음과 같다:
+	
+	\begin{equation}
+		\Delta \ln(BTC_t) = \alpha_1 [\ln(BTC_{t-1}) - \beta \ln(ETH_{t-1}) - c] + \sum_{i=1}^{p} \gamma_i \Delta \ln(BTC_{t-i}) + \sum_{i=1}^{p} \delta_i \Delta \ln(ETH_{t-i}) + \epsilon_{1t}
+	\end{equation}
+	
+	\begin{itemize}
+		\item $[\dots]$ 항은 오차 수정 항(Error Correction Term)으로, 장기 균형에서의 이탈(Spread)을 의미한다.
+		\item $\alpha_1$은 수정 속도(Adjustment Speed) 계수로, 이 값이 음수이며 유의미할 때 가격 차이가 평균으로 회귀한다는 가설이 통계적으로 채택된다.
+	\end{itemize}
+	
+	\section{트레이딩 전략 및 백테스팅}
+	\begin{enumerate}
+		\item \textbf{Z-Score 산출:} 모델에서 도출된 스프레드의 평균($\mu$)과 표준편차($\sigma$)를 이용해 표준화 지수인 $Z_t = \frac{Spread_t - \mu}{\sigma}$를 계산한다.
+		\item \textbf{매매 로직:} 
+		\begin{itemize}
+			\item $Z_t > 2.0$: BTC 과대평가 상황으로 판단하여 \textbf{Short BTC / Long ETH} 진입
+			\item $Z_t < -2.0$: BTC 과소평가 상황으로 판단하여 \textbf{Long BTC / Short ETH} 진입
+			\item $Z_t = 0$: 스프레드가 평균에 회귀함에 따라 \textbf{포지션 전체 청산}
+		\end{itemize}
+		\item \textbf{성과 지표:} 누적 수익률, Sharpe Ratio, MDD(Maximum Drawdown)를 통해 전략의 안정성을 평가한다.
+	\end{enumerate}
+	
+	\section{팀원 역할 분담}
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{ll}
+			\toprule
+			\textbf{역할} & \textbf{담당 업무} \\ \midrule
+			\textbf{팀원 A (Data)} & \texttt{ccxt} API 연동, 데이터 크롤링 및 로그 전처리 총괄 \\
+			\textbf{팀원 B (Stats)} & ADF/Johansen 통계 검정 수행 및 P-value 유의성 검토 \\
+			\textbf{팀원 C (Model)} & VECM 모델 적합, 최적 시차(Lag) 결정 및 계수 추정 \\
+			\textbf{팀원 D (Quant)} & Z-Score 기반 백테스팅 엔진 구축 및 성과 지표 가시화 \\ \bottomrule
+		\end{tabular}
+	\end{table}
+	
+\end{document}

@@ -1,0 +1,24 @@
+# --- Basic Data Processing & Numerical Computation ---
+pandas
+numpy
+openpyxl
+
+# --- Visualization (Essential for Time Series Charts) ---
+matplotlib
+seaborn
+plotly
+
+# --- Traditional Time Series Modeling & Statistical Analysis ---
+statsmodels
+scipy
+
+# --- Machine Learning & Data Preprocessing ---
+scikit-learn
+
+# --- Time Series Specific Libraries (Highly Recommended) ---
+prophet        # Forecasting tool by Meta (Very easy to use)
+darts          # Modern library unifying various time series models
+
+# --- Data Collection (For Financial/Economic Data) ---
+yfinance       # For fetching stock and crypto data
+ccxt           # Crypto exchange API connection (Needed for Crypto_Pair analysis)

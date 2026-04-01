@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시계열 분석 팀 프로젝트 계획서</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --primary: #1e3a5f;
+    --accent: #2e6fad;
+    --accent-light: #e8f0fa;
+    --coral: #c0392b;
+    --coral-light: #fdf0ee;
+    --teal: #0f6e56;
+    --teal-light: #e8f5f0;
+    --amber: #854f0b;
+    --amber-light: #fef8ed;
+    --gray: #4a4a4a;
+    --gray-light: #f5f5f5;
+    --border: #dde3eb;
+    --text: #1a1a2e;
+    --muted: #666;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    background: #fff;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  /* 헤더 */
+  .doc-header {
+    border-top: 4px solid var(--primary);
+    padding-top: 28px;
+    margin-bottom: 36px;
+  }
+  .doc-header .label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .doc-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  .doc-header .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+    margin-top: 14px;
+    font-style: italic;
+  }
+  .meta-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .meta-item {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .meta-item strong { color: var(--text); }
+
+  /* 섹션 */
+  .section { margin-bottom: 36px; }
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .num {
+    background: var(--primary);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sub-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 16px 0 8px;
+  }
+  p { margin-bottom: 10px; color: var(--gray); font-size: 13.5px; }
+
+  /* 강조 박스 */
+  .highlight-box {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 6px 6px 0;
+    margin: 14px 0;
+  }
+  .highlight-box .question {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 14px;
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  /* 변수 카드 */
+  .var-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 14px 0;
+  }
+  .var-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    background: #fafafa;
+  }
+  .var-card .role {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .var-card.indep .role { background: #e8f0fa; color: var(--accent); }
+  .var-card.ctrl .role  { background: #f0f0f0; color: #555; }
+  .var-card.dep .role   { background: var(--teal-light); color: var(--teal); }
+  .var-card .vname { font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 3px; }
+  .var-card .vdetail { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  /* 충격 더미 */
+  .shock-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0;
+  }
+  .shock-card {
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .shock-card.demand { background: var(--coral-light); border: 1px solid #f5c0b5; }
+  .shock-card.supply { background: var(--amber-light); border: 1px solid #f5dbb0; }
+  .shock-card .shock-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .shock-card.demand .shock-title { color: var(--coral); }
+  .shock-card.supply .shock-title { color: var(--amber); }
+  .shock-card ul { list-style: none; padding: 0; }
+  .shock-card ul li {
+    font-size: 12px;
+    color: var(--gray);
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+  }
+  .shock-card ul li:last-child { border-bottom: none; }
+  .shock-card ul li span { font-weight: 500; color: #888; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  /* 분석 단계 */
+  .steps { margin: 14px 0; }
+  .step-item {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-item.eda    .step-num { background: #f0f0f0; color: #555; }
+  .step-item.stat   .step-num { background: var(--accent-light); color: var(--accent); }
+  .step-item.coint  .step-num { background: var(--accent-light); color: var(--accent); }
+  .step-item.vecm   .step-num { background: #ede8fe; color: #5a3ab7; }
+  .step-item.dummy  .step-num { background: var(--coral-light); color: var(--coral); }
+  .step-item.bp     .step-num { background: var(--amber-light); color: var(--amber); }
+  .step-item.interp .step-num { background: var(--teal-light); color: var(--teal); }
+  .step-body { flex: 1; }
+  .step-body .step-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .step-body .step-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .step-body .step-tool {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--gray-light);
+    color: #555;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .step-item.dummy .step-body .step-name,
+  .step-item.dummy .step-body .step-desc { }
+  .step-item.dummy {
+    border-left: 3px solid var(--coral);
+    padding-left: 10px;
+    margin-left: 4px;
+  }
+
+  /* 표 */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin: 14px 0;
+  }
+  thead th {
+    background: var(--primary);
+    color: #fff;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+  }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--gray);
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) td { background: #fafafa; }
+  tbody tr:hover td { background: var(--accent-light); }
+
+  /* 데이터 소스 */
+  .datasource-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .ds-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    background: #fafafa;
+  }
+  .ds-card .ds-var { font-weight: 700; font-size: 12.5px; color: var(--text); margin-bottom: 4px; }
+  .ds-card .ds-source { font-size: 11.5px; color: var(--accent); font-weight: 500; margin-bottom: 3px; }
+  .ds-card .ds-detail { font-size: 11px; color: var(--muted); }
+
+  /* 차별성 */
+  .diff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .diff-card {
+    border-radius: 6px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+  }
+  .diff-card.before { background: #fafafa; }
+  .diff-card.after  { background: var(--accent-light); border-color: #b5d4f4; }
+  .diff-card .diff-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .diff-card.before .diff-label { color: #999; }
+  .diff-card.after  .diff-label { color: var(--accent); }
+  .diff-card .diff-content { font-size: 12.5px; color: var(--gray); line-height: 1.6; }
+
+  /* 툴 배지 */
+  .tool-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .badge {
+    font-size: 11.5px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .badge.python { background: #fff3cd; color: #856404; }
+  .badge.lib    { background: var(--accent-light); color: var(--accent); }
+  .badge.collab { background: var(--teal-light); color: var(--teal); }
+
+  /* 정책 함의 */
+  .policy-box {
+    background: linear-gradient(135deg, #1e3a5f08, #2e6fad10);
+    border: 1px solid #b5d4f4;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+  }
+  .policy-box .policy-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+  .policy-box p { font-size: 13px; color: var(--gray); margin-bottom: 6px; }
+
+  /* 구분선 */
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* 주석 */
+  .footnote {
+    font-size: 11.5px;
+    color: #999;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 32px;
+  }
+
+  @media print {
+    body { padding: 24px; }
+    .step-item.dummy { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="doc-header">
+  <div class="label">시계열 분석 — 팀 프로젝트 계획서</div>
+  <h1>충격 유형 분류에 따른 국제유가의<br>국내 휘발유 가격 전달 구조 분석</h1>
+  <div class="subtitle">
+    지정학적 충격의 유형(수요 충격 vs. 공급 충격)에 따라 국제유가가 국내 휘발유 소비자가격에 전달되는 속도와 구조가 달라지는가?
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><strong>제출일</strong> &nbsp;2025년 4월 30일</div>
+    <div class="meta-item"><strong>분석 기간</strong> &nbsp;1997.01 – 2025.12 (유가 자유화 이후)</div>
+    <div class="meta-item"><strong>분석 주기</strong> &nbsp;월별 (총 348개월)</div>
+  </div>
+</div>
+
+<!-- 1. 프로젝트 개요 -->
+<div class="section">
+  <div class="section-title"><span class="num">1</span> 프로젝트 개요</div>
+  <p>
+    국제유가와 국내 소비자 휘발유 가격 간의 전달 관계는 에너지 경제학에서 오랫동안 연구된 주제이다.
+    기존 선행연구들은 유가 상승이 국내 가격에 양(+)의 영향을 미치며 비대칭적 전달 효과가 존재한다는 사실을 확인해왔으나,
+    충격의 성격(수요 충격 vs. 공급 충격)을 구분하지 않고 전체 기간을 단일하게 분석하는 경향이 있었다.
+  </p>
+  <p>
+    본 연구는 Kilian(2009)의 "Not All Oil Price Shocks Are Alike" 프레임을 한국 소비자 유가 전달 분석에 적용하여,
+    충격 유형별로 전달 속도와 구조가 달라지는지를 VECM과 Bai-Perron 구조변화 검정을 통해 실증 분석한다.
+  </p>
+
+  <div class="highlight-box">
+    <div class="question">
+      "수요 충격(외환위기·금융위기·코로나)과 공급 충격(셰일혁명·러-우 전쟁)은
+      국제유가가 국내 휘발유 소비자가격에 전달되는 속도와 구조를 질적으로 다르게 만드는가?"
+    </div>
+  </div>
+</div>
+
+<!-- 2. 분석 대상 자료 -->
+<div class="section">
+  <div class="section-title"><span class="num">2</span> 분석 대상 자료</div>
+
+  <div class="sub-title">2-1. 핵심 변수</div>
+  <div class="var-grid">
+    <div class="var-card indep">
+      <span class="role">독립변수</span>
+      <div class="vname">WTI 국제유가</div>
+      <div class="vdetail">단위: USD/배럴<br>출처: FRED (DCOILWTICO)<br>로그 변환 후 사용</div>
+    </div>
+    <div class="var-card ctrl">
+      <span class="role">통제변수 (필수)</span>
+      <div class="vname">원/달러 환율</div>
+      <div class="vdetail">단위: KRW/USD<br>출처: 한국은행 ECOS<br>달러→원화 전환 경로 통제</div>
+    </div>
+    <div class="var-card dep">
+      <span class="role">종속변수</span>
+      <div class="vname">국내 휘발유가격</div>
+      <div class="vdetail">단위: 원/리터<br>출처: 한국석유공사 오피넷<br>보통휘발유 월평균가</div>
+    </div>
+  </div>
+
+  <div class="sub-title">2-2. 충격 유형 더미 변수</div>
+  <div class="shock-grid">
+    <div class="shock-card demand">
+      <div class="shock-title">수요 충격 더미 (demand_shock)</div>
+      <ul>
+        <li>아시아 외환위기 <span>1997.11 – 1999.06</span></li>
+        <li>글로벌 금융위기 <span>2008.09 – 2009.06</span></li>
+        <li>코로나19 팬데믹 <span>2020.02 – 2020.12</span></li>
+      </ul>
+    </div>
+    <div class="shock-card supply">
+      <div class="shock-title">공급 충격 더미 (supply_shock)</div>
+      <ul>
+        <li>셰일혁명·OPEC 증산 <span>2014.07 – 2016.12</span></li>
+        <li>러시아-우크라이나 전쟁 <span>2022.02 – 2022.12</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sub-title">2-3. 분석 기간 설정 근거</div>
+  <p>
+    분석 기간을 1997년 이후로 한정한 이유는 동년 석유사업법 개정에 따른 유가 완전 자유화 이후부터
+    국제유가와 국내 소비자가격 간 시장 메커니즘이 실질적으로 작동하기 시작했기 때문이다.
+    자유화 이전 데이터를 포함하면 정부의 가격 통제로 인해 전달 관계가 인위적으로 단절되어
+    공적분·VECM 분석이 왜곡된다.
+  </p>
+</div>
+
+<!-- 3. 연구 방법론 -->
+<div class="section">
+  <div class="section-title"><span class="num">3</span> 연구 방법론 및 모델 선정 근거</div>
+
+  <div class="steps">
+
+    <div class="step-item eda">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-name">탐색적 분석 (EDA)</div>
+        <div class="step-desc">
+          세 변수(WTI·환율·국내유가)를 각각 시계열 플롯으로 시각화하고, ACF/PACF로 자기상관 구조 확인.
+          충격 이벤트 시점을 수직선으로 표시하여 가격 반응 패턴을 시각적으로 탐색.
+        </div>
+        <span class="step-tool">시각화 · ACF/PACF · 스프레드 추이</span>
+      </div>
+    </div>
+
+    <div class="step-item stat">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-name">정상성 검정</div>
+        <div class="step-desc">
+          ADF 검정과 KPSS 검정을 병행하여 세 변수 모두 I(1)임을 확인.
+          단위근이 있는 비정상 시계열을 단순 회귀하면 가짜 관계(spurious regression)가 나올 수 있으므로,
+          공적분 검정 진행의 선행 조건으로 활용.
+        </div>
+        <span class="step-tool">ADF test · KPSS test</span>
+      </div>
+    </div>
+
+    <div class="step-item coint">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-name">공적분 검정 (Johansen test)</div>
+        <div class="step-desc">
+          세 변수 간 장기균형 관계 존재 여부 확인. 공적분이 확인되면 VECM 채택,
+          그렇지 않으면 차분한 변수로 VAR 추정. 유가·환율·국내가격은 이론적으로 공적분 관계가 예상됨.
+        </div>
+        <span class="step-tool">Johansen test (statsmodels)</span>
+      </div>
+    </div>
+
+    <div class="step-item vecm">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-name">기본 VECM 추정 (전체 기간)</div>
+        <div class="step-desc">
+          오차수정계수(ECT)로 장기 균형 이탈 후 국내 유가의 회복 속도 추정.
+          IRF(충격반응함수)로 WTI 1단위 충격 시 국내유가의 시차별 반응 경로 추적.
+          환율을 통제변수로 포함하여 순수 유가 전달 효과 분리.
+        </div>
+        <span class="step-tool">VECM · ECT · IRF · FEVD</span>
+      </div>
+    </div>
+
+    <div class="step-item dummy">
+      <div class="step-num">★</div>
+      <div class="step-body">
+        <div class="step-name">충격 유형 더미 결합 — 핵심 분석</div>
+        <div class="step-desc">
+          수요충격 더미·공급충격 더미를 VECM에 추가하여 충격 유형별 전달 계수를 각각 추정.
+          Wald test로 수요충격 계수 ≠ 공급충격 계수의 통계적 유의성 검정.
+          기존 연구가 "전달 효과 존재"에서 멈춘 것을 "유형별 전달 구조 차이"로 심화하는 핵심 단계.
+        </div>
+        <span class="step-tool">VECM + dummy · Wald test</span>
+      </div>
+    </div>
+
+    <div class="step-item bp">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-name">Bai-Perron 구조변화 검정</div>
+        <div class="step-desc">
+          날짜를 미리 지정하지 않고 데이터가 스스로 구조변화 시점을 탐지.
+          탐지된 시점이 우리가 설정한 이벤트 더미 시점과 일치하는지 교차 검증.
+          주관적 더미 설정에 대한 비판을 차단하는 객관적 근거로 활용.
+        </div>
+        <span class="step-tool">ruptures (Bai-Perron)</span>
+      </div>
+    </div>
+
+    <div class="step-item interp">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <div class="step-name">해석 및 정책 함의</div>
+        <div class="step-desc">
+          충격 유형별 전달 속도 차이를 정량화하고, 과거 분석 결과를 현재 미-이란 전쟁(공급 충격)
+          맥락에서 정책적 함의로 제시. 유류세 탄력세율 조정 등 선제적 개입 시점 논의.
+        </div>
+        <span class="step-tool">결과 해석 · 시나리오 분석</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 4. 선행연구 대비 차별성 -->
+<div class="section">
+  <div class="section-title"><span class="num">4</span> 선행연구 대비 차별성</div>
+
+  <div class="diff-grid">
+    <div class="diff-card before">
+      <div class="diff-label">기존 연구</div>
+      <div class="diff-content">
+        유가 충격을 구분하지 않고 전체 기간을 단일 VECM으로 분석.<br>
+        "전달 효과가 존재한다"는 수준에서 분석이 멈춤.<br>
+        비대칭(상승 vs. 하락)만 분석하고 충격 원천(수요 vs. 공급)은 미구분.
+      </div>
+    </div>
+    <div class="diff-card after">
+      <div class="diff-label">본 연구</div>
+      <div class="diff-content">
+        Kilian(2009) 프레임을 국내 소비자가격 전달 분석에 적용.<br>
+        충격 유형별 더미 + VECM으로 수요 충격 ≠ 공급 충격 구조를 실증.<br>
+        Bai-Perron으로 구조변화 시점을 객관적으로 검증.
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>구분</th>
+        <th>기존 선행연구</th>
+        <th>본 연구</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>분석 초점</td>
+        <td>유가 전달 효과 존재 확인</td>
+        <td>충격 유형별 전달 구조 비교</td>
+      </tr>
+      <tr>
+        <td>충격 분류</td>
+        <td>미구분 (단일 시계열)</td>
+        <td>수요 / 공급 / 혼합 충격 분류</td>
+      </tr>
+      <tr>
+        <td>구조변화</td>
+        <td>특정 시점 Chow test</td>
+        <td>Bai-Perron 자동 탐지 + 이벤트 더미</td>
+      </tr>
+      <tr>
+        <td>시의성</td>
+        <td>과거 데이터 중심</td>
+        <td>미-이란 전쟁 맥락의 정책 함의</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 5. 정책적 함의 -->
+<div class="section">
+  <div class="section-title"><span class="num">5</span> 정책적 함의 및 시의성</div>
+  <div class="policy-box">
+    <div class="policy-title">미-이란 전쟁(2026)과의 연결</div>
+    <p>
+      본 연구의 분석 결과, 지정학적 공급 충격 발생 시 국제유가 상승이 국내 소비자가격에 전달되는 속도가
+      수요 충격 대비 빠른 것으로 나타날 경우, 현재 진행 중인 미-이란 전쟁에 직접적인 정책적 함의를 제공한다.
+    </p>
+    <p>
+      2026년 2월 발발한 미-이란 전쟁으로 호르무즈 해협 봉쇄 위협이 현실화되면서
+      국내 휘발유 가격이 급등하는 패턴은 과거 러-우 전쟁 사례와 유사한 공급 충격 유형으로 분류된다.
+      과거 분석 패턴에 비추어 유류세 탄력세율 조정 등 선제적 개입 시점을 제언할 수 있다.
+    </p>
+  </div>
+</div>
+
+<!-- 6. 도구 -->
+<div class="section">
+  <div class="section-title"><span class="num">6</span> 사용 도구 및 협업 환경</div>
+  <div class="tool-badges">
+    <span class="badge python">Python 3.x</span>
+    <span class="badge lib">statsmodels</span>
+    <span class="badge lib">pandas / numpy</span>
+    <span class="badge lib">ruptures</span>
+    <span class="badge lib">pandas-datareader</span>
+    <span class="badge lib">matplotlib / plotly</span>
+    <span class="badge collab">Google Colab</span>
+    <span class="badge collab">GitHub (racoonon/TimeSeries)</span>
+  </div>
+
+  <table style="margin-top:12px;">
+    <thead>
+      <tr><th>역할</th><th>담당 업무</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>데이터 수집</td><td>FRED API(WTI), ECOS API(환율), 오피넷 CSV(국내유가) 수집 및 전처리</td></tr>
+      <tr><td>정상성 검정</td><td>ADF·KPSS 검정 수행 및 I(1) 확인, 로그 변환 처리</td></tr>
+      <tr><td>VECM 추정</td><td>Johansen 공적분 검정, VECM 모형 적합, ECT·IRF 추정</td></tr>
+      <tr><td>더미·구조변화</td><td>충격 유형 더미 설계, Wald test, Bai-Perron 검정</td></tr>
+      <tr><td>해석·발표</td><td>결과 시각화, 정책 함의 도출, 최종 보고서 작성</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footnote">
+  본 계획서는 실제 발표 및 최종 보고서와 상이하여도 무방합니다. &nbsp;|&nbsp;
+  참고 문헌: Kilian, L. (2009). "Not All Oil Price Shocks Are Alike." <em>American Economic Review</em>, 99(3), 1053–1069.
+</div>
+
+</body>
+</html>

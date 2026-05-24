@@ -557,3 +557,8 @@ $RECYCLE.BIN/
 # --- Data Directories ---
 data/
 **/data/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/

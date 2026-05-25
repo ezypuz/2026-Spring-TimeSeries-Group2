@@ -1,6 +1,8 @@
+import csv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime as _dt
 from pathlib import Path
 
 from statsmodels.tsa.stattools import adfuller
@@ -10,11 +12,12 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from scipy.stats import jarque_bera, shapiro
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-from .config import LONG_MISSING as _DEFAULT_LONG_MISSING
+from .config import LONG_MISSING as _DEFAULT_LONG_MISSING, DATA_START_YEAR as _DEFAULT_START_YEAR
 
 
-def load_filtered_csvs(data_dir: Path) -> pd.DataFrame:
-    files = sorted(data_dir.glob("filtered_2*.csv"))
+def load_filtered_csvs(data_dir: Path, start_year: int = _DEFAULT_START_YEAR) -> pd.DataFrame:
+    files = sorted(f for f in data_dir.glob("filtered_2*.csv")
+                   if int(f.stem[9:13]) >= start_year)
     if not files:
         raise FileNotFoundError(f"filtered_*.csv 파일이 없습니다: {data_dir}")
     parts = [
@@ -72,8 +75,8 @@ def load_weather(data_dir: Path) -> pd.DataFrame:
     parts = []
     for f in files:
         df = pd.read_csv(f, encoding="cp949",
-                         usecols=["일시", "기온(°C)"],
-                         dtype={"기온(°C)": float})
+                         usecols=["일시", "기온(°C)", "강수량(mm)"],
+                         dtype={"기온(°C)": float, "강수량(mm)": float})
         parts.append(df)
     weather = pd.concat(parts, ignore_index=True)
     weather["datetime"] = pd.to_datetime(weather["일시"])
@@ -81,11 +84,12 @@ def load_weather(data_dir: Path) -> pd.DataFrame:
         weather
         .set_index("datetime")
         .drop(columns=["일시"])
-        .rename(columns={"기온(°C)": "temp"})
+        .rename(columns={"기온(°C)": "temp", "강수량(mm)": "rain"})
         .sort_index()
         .resample("h").mean()
     )
     weather["temp"] = weather["temp"].interpolate(method="linear")
+    weather["rain"] = weather["rain"].fillna(0)  # NaN = 강수 없음 (0mm)
     return weather
 
 
@@ -102,6 +106,7 @@ def make_features(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     df["rolling_mean_24"]  = df["CNT"].shift(1).rolling(24).mean()
     df["rolling_mean_168"] = df["CNT"].shift(1).rolling(168).mean()
     df["temp"] = weather_df["temp"].reindex(df.index).ffill()
+    df["rain"] = weather_df["rain"].reindex(df.index).fillna(0)
     return df.dropna()
 
 
@@ -249,3 +254,107 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
         f"Asym.RMSE(alpha={alpha})": round(asym, 3),
         "Under-pred rate(%)": round(under_rate, 1),
     }
+
+
+# ── 결과 저장 / 체크포인트 ─────────────────────────────────────────
+
+_RESULTS_COLS = [
+    "timestamp", "station_id", "day_type", "model", "fold",
+    "RMSE", "MAE", "Asym_RMSE", "Under_pred_rate",
+]
+
+
+def save_result(record: dict, results_csv: Path) -> None:
+    """결과 1건을 CSV에 append. 파일 없으면 헤더 포함해 생성."""
+    is_new = not results_csv.exists()
+    with open(results_csv, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=_RESULTS_COLS)
+        if is_new:
+            writer.writeheader()
+        row = {k: record.get(k, "") for k in _RESULTS_COLS}
+        row.setdefault("timestamp", _dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+        writer.writerow(row)
+
+
+def load_done_keys(results_csv: Path) -> set:
+    """이미 완료된 (station_id, day_type, model) 조합 반환."""
+    if not results_csv.exists():
+        return set()
+    df = pd.read_csv(results_csv)
+    return set(zip(df["station_id"], df["day_type"], df["model"]))
+
+
+# ── Rolling Cross-Validation ──────────────────────────────────────
+
+def rolling_cv_sarima(series: pd.Series,
+                       order: tuple, seasonal_order: tuple,
+                       exog_df: pd.DataFrame = None,
+                       n_splits: int = 3, test_days: int = 30,
+                       alpha: float = 2.0) -> list:
+    """
+    시계열 rolling CV (expanding window).
+    fold=1 이 가장 최근 구간, fold=n_splits 이 가장 오래된 구간.
+    """
+    n_test = test_days * 24
+    results = []
+    for fold in range(1, n_splits + 1):
+        test_end   = len(series) - (fold - 1) * n_test
+        test_start = test_end - n_test
+        if test_start < n_test:
+            break
+        train_s = series.iloc[:test_start].dropna()
+        test_s  = series.iloc[test_start:test_end]
+        exog_tr = exog_df.iloc[:test_start] if exog_df is not None else None
+        exog_te = exog_df.iloc[test_start:test_end] if exog_df is not None else None
+
+        fitted = SARIMAX(
+            train_s, order=order, seasonal_order=seasonal_order,
+            exog=exog_tr, enforce_stationarity=False, enforce_invertibility=False,
+        ).fit(disp=False)
+
+        fc = np.maximum(fitted.forecast(steps=len(test_s), exog=exog_te).values, 0)
+        rmse  = float(np.sqrt(mean_squared_error(test_s, fc)))
+        mae   = float(mean_absolute_error(test_s, fc))
+        asym  = asymmetric_rmse(test_s.values, fc, alpha=alpha)
+        under = float((fc - test_s.values < 0).mean() * 100)
+
+        results.append({
+            "fold": fold,
+            "RMSE": round(rmse, 3),
+            "MAE": round(mae, 3),
+            "Asym_RMSE": round(asym, 3),
+            "Under_pred_rate": round(under, 1),
+        })
+    return results
+
+
+def rolling_cv_ml(X: pd.DataFrame, y: pd.Series,
+                   model,
+                   n_splits: int = 5, test_days: int = 30,
+                   alpha: float = 2.0) -> list:
+    """ML 모델용 rolling CV."""
+    n_test = test_days * 24
+    results = []
+    for fold in range(1, n_splits + 1):
+        test_end   = len(X) - (fold - 1) * n_test
+        test_start = test_end - n_test
+        if test_start < n_test:
+            break
+        X_tr, y_tr = X.iloc[:test_start], y.iloc[:test_start]
+        X_te, y_te = X.iloc[test_start:test_end], y.iloc[test_start:test_end]
+
+        model.fit(X_tr, y_tr)
+        pred  = np.maximum(model.predict(X_te), 0)
+        rmse  = float(np.sqrt(mean_squared_error(y_te, pred)))
+        mae   = float(mean_absolute_error(y_te, pred))
+        asym  = asymmetric_rmse(y_te.values, pred, alpha=alpha)
+        under = float((pred - y_te.values < 0).mean() * 100)
+
+        results.append({
+            "fold": fold,
+            "RMSE": round(rmse, 3),
+            "MAE": round(mae, 3),
+            "Asym_RMSE": round(asym, 3),
+            "Under_pred_rate": round(under, 1),
+        })
+    return results

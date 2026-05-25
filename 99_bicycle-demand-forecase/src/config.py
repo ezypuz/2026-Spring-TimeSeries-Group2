@@ -6,6 +6,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 SEASONAL_PERIOD = 24   # hourly data → daily cycle
 TEST_DAYS = 30
 ALPHA = 2.0            # asymmetric loss under-prediction penalty
+DATA_START_YEAR = 2023 # exclude COVID period (2021-2022)
 TARGET_RENT_ID = "02128"
 
 TARGET_RENT_IDS = [

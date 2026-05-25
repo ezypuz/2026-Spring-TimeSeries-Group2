@@ -42,10 +42,13 @@ N_SPLITS_ML     = 5
 # ── Phase 1: auto_arima ───────────────────────────────────────────
 
 def find_order(series: pd.Series, exog=None) -> dict:
-    """d=0, D=1, m=24 고정 후 p,q,P,Q 탐색."""
+    """최근 1년치(~8760시간)로 d=0, D=1, m=24 고정 후 p,q,P,Q 탐색."""
+    sample = series.dropna().iloc[-8760:]
+    exog_sample = exog.iloc[-8760:] if exog is not None else None
+
     model = auto_arima(
-        series.dropna(),
-        exogenous=exog,
+        sample,
+        exogenous=exog_sample,
         d=0, D=1,
         seasonal=True, m=24,
         information_criterion="aic",

@@ -11,6 +11,8 @@ plotly
 # --- Traditional Time Series Modeling & Statistical Analysis ---
 statsmodels
 scipy
+pmdarima       # auto_arima for automatic ARIMA order selection
+xgboost        # Gradient boosting ML model
 
 # --- Machine Learning & Data Preprocessing ---
 scikit-learn

@@ -22,3 +22,5 @@ darts          # Modern library unifying various time series models
 # --- Data Collection (For Financial/Economic Data) ---
 yfinance       # For fetching stock and crypto data
 ccxt           # Crypto exchange API connection (Needed for Crypto_Pair analysis)
+python-binance # Binance REST/WebSocket API client (Needed for Crypto_Pair analysis)
+python-dotenv  # Load environment variables from .env file

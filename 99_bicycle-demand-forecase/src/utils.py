@@ -88,6 +88,27 @@ def load_weather(data_dir: Path) -> pd.DataFrame:
     weather["temp"] = weather["temp"].interpolate(method="linear")
     return weather
 
+def load_weather_full(data_dir: Path) -> pd.DataFrame:
+    files = sorted(data_dir.glob("*_weather.csv"))
+    parts = []
+    for f in files:
+        df = pd.read_csv(f, encoding="cp949",
+                         usecols=["일시", "기온(°C)", "강수량(mm)"],
+                         dtype={"기온(°C)": float, "강수량(mm)": float})
+        parts.append(df)
+    weather = pd.concat(parts, ignore_index=True)
+    weather["datetime"] = pd.to_datetime(weather["일시"])
+    weather = (
+        weather
+        .set_index("datetime")
+        .drop(columns=["일시"])
+        .rename(columns={"기온(°C)": "temp", "강수량(mm)": "rainfall"})
+        .sort_index()
+        .resample("h").mean()
+    )
+    weather["temp"] = weather["temp"].interpolate(method="linear")
+    weather["rainfall"] = weather["rainfall"].fillna(0)
+    return weather
 
 def make_features(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     """ML용 피처 행렬 생성 (시간 특성 + lag + 기온)."""
@@ -104,6 +125,21 @@ def make_features(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     df["temp"] = weather_df["temp"].reindex(df.index).ffill()
     return df.dropna()
 
+def make_features_full(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
+    """ML용 피처 행렬 생성 (시간 특성 + lag + 기온)."""
+    df = pd.DataFrame({"CNT": series})
+    df["hour"]       = df.index.hour
+    df["dayofweek"]  = df.index.dayofweek
+    df["month"]      = df.index.month
+    df["is_weekend"] = (df.index.dayofweek >= 5).astype(int)
+    df["lag_1"]      = df["CNT"].shift(1)
+    df["lag_24"]     = df["CNT"].shift(24)
+    df["lag_168"]    = df["CNT"].shift(168)
+    df["rolling_mean_24"]  = df["CNT"].shift(1).rolling(24).mean()
+    df["rolling_mean_168"] = df["CNT"].shift(1).rolling(168).mean()
+    df["temp"] = weather_df["temp"].reindex(df.index).ffill()
+    df["rainfall"] = (weather_df["rainfall"].reindex(df.index).fillna(0))
+    return df.dropna()
 
 def adf_test(series: pd.Series, name: str = "", maxlag: int = 6) -> bool:
     result = adfuller(series.dropna(), maxlag=maxlag, autolag="AIC")
@@ -221,12 +257,14 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
     mae       = mean_absolute_error(y_test, forecast)
     asym      = asymmetric_rmse(y_test.values, y_pred, alpha=alpha)
     under_rate = (errors < 0).mean() * 100
+    over_rate = (errors > 0).mean() * 100
 
     print(f"[{model_name}]")
     print(f"  RMSE            : {rmse:.3f}")
     print(f"  MAE             : {mae:.3f}")
     print(f"  Asymmetric RMSE : {asym:.3f}  (alpha={alpha})")
     print(f"  Under-pred rate : {under_rate:.1f}%")
+    print(f"  Over-pred rate : {over_rate:.1f}%")
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 8))
     axes[0].plot(y_test.index, y_test.values, label="Actual (y)", alpha=0.7)
@@ -238,7 +276,7 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
     colors = ["red" if e < 0 else "steelblue" for e in errors]
     axes[1].bar(range(len(errors)), errors.values, color=colors, alpha=0.6, width=1)
     axes[1].axhline(0, color="black", linewidth=0.8)
-    axes[1].set_title(f"Forecast Error | Red=Under, Blue=Over | Under-pred={under_rate:.1f}%")
+    axes[1].set_title(f"Forecast Error | Red=Under, Blue=Over | Under-pred={under_rate:.1f}% | Over-pred={over_rate:.1f}%")
     plt.tight_layout()
     plt.show()
 
@@ -248,4 +286,5 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
         "MAE": round(mae, 3),
         f"Asym.RMSE(alpha={alpha})": round(asym, 3),
         "Under-pred rate(%)": round(under_rate, 1),
+        "Over-pred rate(%)": round(over_rate, 1)
     }

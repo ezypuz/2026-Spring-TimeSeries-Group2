@@ -42,8 +42,6 @@ print(f"주말 train: {train.index[0].date()} ~ {train.index[-1].date()}  ({len(
 print("\nstatsforecast AutoARIMA 실행 중...")
 model = AutoARIMA(
     season_length=SEASONAL_PERIOD,
-    max_p=2, max_q=2,
-    max_P=2, max_Q=2,
     d=0,
     D=1,
     stepwise=True,

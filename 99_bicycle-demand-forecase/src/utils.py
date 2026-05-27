@@ -88,6 +88,103 @@ def load_weather(data_dir: Path) -> pd.DataFrame:
     weather["temp"] = weather["temp"].interpolate(method="linear")
     return weather
 
+def load_weather_full(data_dir: Path) -> pd.DataFrame:
+    files = sorted(data_dir.glob("*_weather.csv"))
+    parts = []
+    for f in files:
+        df = pd.read_csv(f, encoding="cp949",
+                         usecols=["일시", "기온(°C)", "강수량(mm)"],
+                         dtype={"기온(°C)": float, "강수량(mm)": float})
+        parts.append(df)
+    weather = pd.concat(parts, ignore_index=True)
+    weather["datetime"] = pd.to_datetime(weather["일시"])
+    weather = (
+        weather
+        .set_index("datetime")
+        .drop(columns=["일시"])
+        .rename(columns={"기온(°C)": "temp", "강수량(mm)": "rainfall"})
+        .sort_index()
+        .resample("h").mean()
+    )
+    weather["temp"] = weather["temp"].interpolate(method="linear")
+    weather["rainfall"] = weather["rainfall"].fillna(0)
+    return weather
+
+def load_rainfall_binary(data_dir: Path, threshold: float = 1.0) -> pd.DataFrame:
+    """
+    날씨 CSV에서 기온 + 강수 여부(binary) 로드.
+    - threshold mm 이상이면 1, 미만이면 0
+    - 11~3월은 3시간 간격 관측: 결측은 앞뒤 관측값이 둘 다 존재하고 둘 다 1일 때만 1, 나머지 0
+    - 4~10월: 결측 → 0 (보수적 처리)
+    """
+    files = sorted(data_dir.glob("*_weather.csv"))
+    parts = []
+    for f in files:
+        df = pd.read_csv(f, encoding="cp949",
+                         usecols=["일시", "기온(°C)", "강수량(mm)"],
+                         dtype={"기온(°C)": float, "강수량(mm)": float})
+        parts.append(df)
+    weather = pd.concat(parts, ignore_index=True)
+    weather["datetime"] = pd.to_datetime(weather["일시"])
+    weather = (
+        weather
+        .set_index("datetime")
+        .drop(columns=["일시"])
+        .rename(columns={"기온(°C)": "temp", "강수량(mm)": "rainfall"})
+        .sort_index()
+        .resample("h").mean()
+    )
+    weather["temp"] = weather["temp"].interpolate(method="linear")
+
+    # 관측값 기준 binary (결측은 NaN 유지)
+    raw_binary = (weather["rainfall"] >= threshold).astype(float)
+    raw_binary[weather["rainfall"].isna()] = np.nan
+
+    rain_binary = pd.Series(0, index=weather.index)
+
+    for ts in weather.index[weather["rainfall"].isna()]:
+        month = ts.month
+
+        # 4~10월: 보수적으로 0
+        if 4 <= month <= 10:
+            rain_binary[ts] = 0
+            continue
+
+        # 11~3월: 앞뒤 3시간 이내 관측값 탐색
+        prev_val = None
+        next_val = None
+
+        for h in range(1, 4):
+            prev_ts = ts - pd.Timedelta(hours=h)
+            if prev_ts in raw_binary.index and not np.isnan(raw_binary[prev_ts]):
+                # 3시간 이내에 관측값 존재 → 사용
+                prev_val = raw_binary[prev_ts]
+                break
+            # h시간 전도 결측이면 → 간격이 3시간 초과로 볼 수 없으므로 탐색 중단
+            if prev_ts in raw_binary.index and np.isnan(raw_binary[prev_ts]):
+                continue
+
+        for h in range(1, 4):
+            next_ts = ts + pd.Timedelta(hours=h)
+            if next_ts in raw_binary.index and not np.isnan(raw_binary[next_ts]):
+                next_val = raw_binary[next_ts]
+                break
+            if next_ts in raw_binary.index and np.isnan(raw_binary[next_ts]):
+                continue
+
+        # 앞뒤 둘 다 존재하고 둘 다 1일 때만 1
+        if prev_val is not None and next_val is not None:
+            rain_binary[ts] = 1 if (prev_val == 1 and next_val == 1) else 0
+        else:
+            # 앞뒤 중 하나라도 없으면 (간격 초과) → 0
+            rain_binary[ts] = 0
+
+    # 관측값 있는 시간대는 threshold 기준 그대로 적용
+    observed_mask = weather["rainfall"].notna()
+    rain_binary[observed_mask] = (weather["rainfall"][observed_mask] >= threshold).astype(int)
+
+    weather["rain_binary"] = rain_binary
+    return weather.drop(columns=["rainfall"])
 
 def make_features(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     """ML용 피처 행렬 생성 (시간 특성 + lag + 기온)."""
@@ -104,6 +201,37 @@ def make_features(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     df["temp"] = weather_df["temp"].reindex(df.index).ffill()
     return df.dropna()
 
+def make_features_full(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
+    """ML용 피처 행렬 생성 (시간 특성 + lag + 기온)."""
+    df = pd.DataFrame({"CNT": series})
+    df["hour"]       = df.index.hour
+    df["dayofweek"]  = df.index.dayofweek
+    df["month"]      = df.index.month
+    df["is_weekend"] = (df.index.dayofweek >= 5).astype(int)
+    df["lag_1"]      = df["CNT"].shift(1)
+    df["lag_24"]     = df["CNT"].shift(24)
+    df["lag_168"]    = df["CNT"].shift(168)
+    df["rolling_mean_24"]  = df["CNT"].shift(1).rolling(24).mean()
+    df["rolling_mean_168"] = df["CNT"].shift(1).rolling(168).mean()
+    df["temp"] = weather_df["temp"].reindex(df.index).ffill()
+    df["rainfall"] = (weather_df["rainfall"].reindex(df.index).fillna(0))
+    return df.dropna()
+
+def make_features_rainfall_binary(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
+    """ML용 피처 행렬 생성 (시간 특성 + lag + 기온 + 강수여부 binary)."""
+    df = pd.DataFrame({"CNT": series})
+    df["hour"]       = df.index.hour
+    df["dayofweek"]  = df.index.dayofweek
+    df["month"]      = df.index.month
+    df["is_weekend"] = (df.index.dayofweek >= 5).astype(int)
+    df["lag_1"]      = df["CNT"].shift(1)
+    df["lag_24"]     = df["CNT"].shift(24)
+    df["lag_168"]    = df["CNT"].shift(168)
+    df["rolling_mean_24"]  = df["CNT"].shift(1).rolling(24).mean()
+    df["rolling_mean_168"] = df["CNT"].shift(1).rolling(168).mean()
+    df["temp"]        = weather_df["temp"].reindex(df.index).ffill()
+    df["rain_binary"] = weather_df["rain_binary"].reindex(df.index).fillna(0).astype(int)
+    return df.dropna()
 
 def adf_test(series: pd.Series, name: str = "", maxlag: int = 6) -> bool:
     result = adfuller(series.dropna(), maxlag=maxlag, autolag="AIC")
@@ -221,12 +349,14 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
     mae       = mean_absolute_error(y_test, forecast)
     asym      = asymmetric_rmse(y_test.values, y_pred, alpha=alpha)
     under_rate = (errors < 0).mean() * 100
+    over_rate = (errors > 0).mean() * 100
 
     print(f"[{model_name}]")
     print(f"  RMSE            : {rmse:.3f}")
     print(f"  MAE             : {mae:.3f}")
     print(f"  Asymmetric RMSE : {asym:.3f}  (alpha={alpha})")
     print(f"  Under-pred rate : {under_rate:.1f}%")
+    print(f"  Over-pred rate : {over_rate:.1f}%")
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 8))
     axes[0].plot(y_test.index, y_test.values, label="Actual (y)", alpha=0.7)
@@ -238,7 +368,7 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
     colors = ["red" if e < 0 else "steelblue" for e in errors]
     axes[1].bar(range(len(errors)), errors.values, color=colors, alpha=0.6, width=1)
     axes[1].axhline(0, color="black", linewidth=0.8)
-    axes[1].set_title(f"Forecast Error | Red=Under, Blue=Over | Under-pred={under_rate:.1f}%")
+    axes[1].set_title(f"Forecast Error | Red=Under, Blue=Over | Under-pred={under_rate:.1f}% | Over-pred={over_rate:.1f}%")
     plt.tight_layout()
     plt.show()
 
@@ -248,4 +378,5 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
         "MAE": round(mae, 3),
         f"Asym.RMSE(alpha={alpha})": round(asym, 3),
         "Under-pred rate(%)": round(under_rate, 1),
+        "Over-pred rate(%)": round(over_rate, 1)
     }

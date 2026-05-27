@@ -1,5 +1,5 @@
 """
-2023년 available 데이터(주말)로 statsforecast AutoARIMA 차수 탐색
+2023년 available 데이터(전체: 주중+주말)로 statsforecast AutoARIMA 차수 탐색
 statsforecast는 Cython 기반으로 pmdarima 대비 메모리/속도 효율적
 데이터: data/available_2023MM.csv (available_202301.csv ~ available_202312.csv)
 """
@@ -17,7 +17,7 @@ SEASONAL_PERIOD = 24
 TARGET_RENT_ID  = 2128
 
 # ── 2023년 available 데이터 로드 ──────────────────────────────────────────────
-files = sorted(DATA_DIR.glob("available_2023*.csv"))
+files = sorted(DATA_DIR.glob("interpolated_available_2023*.csv"))
 if not files:
     raise FileNotFoundError(f"available_2023*.csv 파일이 없습니다: {DATA_DIR}")
 
@@ -30,19 +30,19 @@ df["RENT_ID"] = df["RENT_ID"].astype(int)
 print(f"로드 파일 수: {len(files)}개")
 print(f"기간: {df['datetime'].min().date()} ~ {df['datetime'].max().date()}")
 
-# ── 주말 시계열 생성 ──────────────────────────────────────────────────────────
+# ── 전체(주중+주말) 시계열 생성 ───────────────────────────────────────────────
 sub = df[df["RENT_ID"] == TARGET_RENT_ID].set_index("datetime")["AVAILABLE"].sort_index()
 full_idx = pd.date_range(sub.index.min(), sub.index.max(), freq="h")
 series = sub.reindex(full_idx).astype(float)
 
-train = series[series.index.dayofweek >= 5].dropna()
-print(f"주말 train: {train.index[0].date()} ~ {train.index[-1].date()}  ({len(train):,}시간)")
+train = series.dropna()
+print(f"전체 train: {train.index[0].date()} ~ {train.index[-1].date()}  ({len(train):,}시간)")
 
 # ── AutoARIMA 차수 탐색 ───────────────────────────────────────────────────────
 print("\nstatsforecast AutoARIMA 실행 중...")
 model = AutoARIMA(
     season_length=SEASONAL_PERIOD,
-    d=0,
+    d=1,
     D=1,
     stepwise=True,
     approximation=False,

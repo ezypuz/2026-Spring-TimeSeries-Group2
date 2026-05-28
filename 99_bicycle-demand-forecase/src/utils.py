@@ -380,3 +380,24 @@ def evaluate_ml_forecast(y_test: pd.Series, y_pred,
         "Under-pred rate(%)": round(under_rate, 1),
         "Over-pred rate(%)": round(over_rate, 1)
     }
+
+def evaluate_ml_forecast_collect(y_test: pd.Series, y_pred,
+                          model_name: str, alpha: float = 2.0, station_id: int = 2128) -> dict:
+    forecast  = pd.Series(y_pred, index=y_test.index)
+    errors    = forecast - y_test
+
+    rmse      = np.sqrt(mean_squared_error(y_test, forecast))
+    mae       = mean_absolute_error(y_test, forecast)
+    asym      = asymmetric_rmse(y_test.values, y_pred, alpha=alpha)
+    under_rate = (errors < 0).mean() * 100
+    over_rate = (errors > 0).mean() * 100
+
+    return {
+        "station_id": station_id,
+        "model": model_name,
+        "RMSE": round(rmse, 3),
+        "MAE": round(mae, 3),
+        f"Asym.RMSE(alpha={alpha})": round(asym, 3),
+        "Under-pred rate(%)": round(under_rate, 1),
+        "Over-pred rate(%)": round(over_rate, 1)
+    }

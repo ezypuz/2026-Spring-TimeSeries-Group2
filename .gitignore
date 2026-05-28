@@ -562,3 +562,6 @@ data/
 .Rhistory
 .RData
 .Rproj.user/
+
+# VScode
+.vscode/

@@ -15,7 +15,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestRegressor
-from src.utils import load_rainfall_binary, make_features_rainfall_binary, evaluate_ml_forecast_collect
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from src.utils import load_rainfall_binary, make_features_ML, asymmetric_rmse
 
 try:
     import xgboost as xgb
@@ -30,7 +31,7 @@ except ImportError:
 # Settings
 DATA_DIR        = Path("data")   # interpolated_available_YYYYMM.csv
 SEASONAL_PERIOD = 24             # 일일 계절 주기 (시간 단위 → S=24)
-TEST_DAYS       = 30             # 마지막 30일을 test set으로 사용
+TEST_DAYS       = 7             # 마지막 7일을 test set으로 사용
 ALPHA = 0.5                      # Underestimate penalty rate 
 TARGET_RENT_IDS = [
     2111, 2112, 2116, 2122, 2128, 2129, 2130,
@@ -38,9 +39,6 @@ TARGET_RENT_IDS = [
     2179, 2185, 2186, 2191, 2198, 2199, 3310, 
     3311, 3802,
 ]
-
-plt.rcParams["figure.dpi"] = 120
-plt.rcParams["font.family"] = "DejaVu Sans"
 
 # Define functions
 def load_available_csvs(data_dir: Path) -> pd.DataFrame:
@@ -53,7 +51,7 @@ def load_available_csvs(data_dir: Path) -> pd.DataFrame:
         df["DATE"].astype(str) + df["TIME"].astype(str).str.zfill(2),
         format="%Y%m%d%H"
     )
-    df["RENT_ID"] = df["RENT_ID"].astype(int)
+    #df["RENT_ID"] = df["RENT_ID"].astype(int)
     return df
 
 def make_series(df: pd.DataFrame, rent_id: int) -> pd.Series:
@@ -87,8 +85,42 @@ def asymmetric_obj(y_pred, dtrain, alpha=2.0):
                     2 * np.ones_like(errors))
     return grad, hess
 
+def make_perf(y_test, y_pred, model_name, station_id, alpha=2.0):
+    y_test  = np.asarray(y_test)
+    y_pred  = np.asarray(y_pred)
+    errors  = y_pred - y_test
+    rmse    = float(np.sqrt(mean_squared_error(y_test, y_pred)))
+    mae     = float(mean_absolute_error(y_test, y_pred))
+    asym    = float(asymmetric_rmse(y_test, y_pred, alpha=alpha))
+    under = float((errors < 0).mean() * 100)
+    over   = float((errors > 0).mean() * 100)
+    
+    mean_y  = float(np.mean(y_test))
+    cv_rmse = float(rmse / mean_y * 100) if mean_y > 0 else float("nan")
+    
+    # MAPE: y=0인 시점 제외
+    mask    = y_test > 0
+    mape    = float(np.mean(np.abs(errors[mask] / y_test[mask])) * 100) if mask.any() else float("nan")
+    
+    print(f"    [{model_name}] RMSE={rmse:.3f} | MAE={mae:.3f} | "
+          f"Asym.RMSE={asym:.3f} | Under={under:.1f}% | "
+          f"Over={over:.1f}% | CV-RMSE={cv_rmse:.1f}% | "
+          f"MAPE={mape:.1f}%")
+    return {
+        "station_id":                station_id,
+        "model":                     model_name,
+        "RMSE":                      round(rmse, 3),
+        "MAE":                       round(mae, 3),
+        f"Asym.RMSE(alpha={alpha})": round(asym, 3),
+        "Under-pred rate(%)":        round(under, 1),
+        "Over-pred rate(%)":        round(over, 1),
+        "CV-RMSE(%)":                round(cv_rmse, 1),
+        "MAPE(%)":                   round(mape, 1),
+    }
+
 # Load data & Preporcessing.
 df_raw = load_available_csvs(DATA_DIR)
+df_raw = df_raw[df_raw["datetime"].dt.year >= 2023]
 weather_df = load_rainfall_binary(DATA_DIR)
 
 # Collect all station results
@@ -100,7 +132,7 @@ for TARGET_RENT_ID in TARGET_RENT_IDS:
 
     try:
         series = make_series(df_raw, TARGET_RENT_ID)
-        df_feat = make_features_rainfall_binary(series, weather_df)
+        df_feat = make_features_ML(series, weather_df)
 
 
         # Train / Test Split
@@ -126,7 +158,7 @@ for TARGET_RENT_ID in TARGET_RENT_IDS:
         )
         rf_model.fit(X_train, y_train)
         y_pred_rf = rf_model.predict(X_test)
-        perf_rf = evaluate_ml_forecast_collect(y_test, 
+        perf_rf = make_perf(y_test, 
                                                y_pred_rf,
                                                model_name="Random Forest", 
                                                alpha=ALPHA, 
@@ -152,7 +184,7 @@ for TARGET_RENT_ID in TARGET_RENT_IDS:
             verbose=False,
         )
         y_pred_xgb = xgb_model.predict(X_test)
-        perf_xgb   = evaluate_ml_forecast_collect(y_test, 
+        perf_xgb   = make_perf(y_test, 
                                                y_pred_xgb,
                                                model_name="XGBoost", 
                                                alpha=ALPHA, 
@@ -184,7 +216,7 @@ for TARGET_RENT_ID in TARGET_RENT_IDS:
 
 
         y_pred_xgb_asym= xgb_asym_model.predict(dtest)
-        perf_xgb_asym = evaluate_ml_forecast_collect(y_test, 
+        perf_xgb_asym = make_perf(y_test, 
                                                y_pred_xgb_asym,
                                                model_name=f"XGBoost (alpha={ALPHA})", 
                                                alpha=ALPHA, 
@@ -199,7 +231,7 @@ for TARGET_RENT_ID in TARGET_RENT_IDS:
 
 print("\n" + "=" * 60)
 print("All station benchmarks completed successfully.")
-print("Results saved to: results/station_benchmark_results.csv")
+print("Results saved to: results/available_ml_benchmark_results.csv")
 print("=" * 60)
 
 # Save benchmark results

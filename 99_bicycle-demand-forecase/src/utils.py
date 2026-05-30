@@ -217,7 +217,7 @@ def make_features_full(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFr
     df["rainfall"] = (weather_df["rainfall"].reindex(df.index).fillna(0))
     return df.dropna()
 
-def make_features_rainfall_binary(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
+def make_features_ML(series: pd.Series, weather_df: pd.DataFrame) -> pd.DataFrame:
     """ML용 피처 행렬 생성 (시간 특성 + lag + 기온 + 강수여부 binary)."""
     df = pd.DataFrame({"CNT": series})
     df["hour"]       = df.index.hour
